@@ -3,25 +3,96 @@
 <head>
 <meta charset="UTF-8">
 <title>Sync App</title>
+
+<style>
+body {
+    font-family: Arial;
+    background: #0f172a;
+    color: white;
+    text-align: center;
+    padding: 30px;
+}
+
+.container {
+    max-width: 400px;
+    margin: auto;
+    background: #1e293b;
+    padding: 20px;
+    border-radius: 12px;
+}
+
+h2 {
+    margin-top: 20px;
+}
+
+input, button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 8px;
+    border: none;
+}
+
+input {
+    background: #334155;
+    color: white;
+}
+
+button {
+    background: #3b82f6;
+    color: white;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #2563eb;
+}
+
+.file-label {
+    display: block;
+    margin-top: 10px;
+    padding: 10px;
+    background: #334155;
+    border-radius: 8px;
+}
+
+.status {
+    margin-top: 15px;
+    font-weight: bold;
+}
+</style>
 </head>
+
 <body>
+
+<div class="container">
 
 <h2>ペア接続</h2>
 
 <input id="pairId" placeholder="ペアIDを入力">
 <button onclick="pair()">接続</button>
 
+<p id="myIdDisplay"></p>
+
 <h2>ファイル送信</h2>
 
-<input type="file" id="fileInput">
+<label class="file-label">
+    <input type="file" id="fileInput" onchange="updateFileName()" hidden>
+    <span id="fileName">選択されていません</span>
+</label>
+
 <button onclick="sendFile()">送信</button>
 
-<p id="status"></p>
+<p class="status" id="status">未接続</p>
+
+</div>
 
 <script>
 let ws
 let myId = Math.random().toString(36).substring(2, 8)
 let targetId = null
+
+document.getElementById("myIdDisplay").innerText = "あなたのID: " + myId
 
 ws = new WebSocket("ws://localhost:3000")
 
@@ -34,15 +105,15 @@ ws.onmessage = async (event) => {
 
     if (msg.type === "pair-success") {
         targetId = msg.from
-        document.getElementById("status").innerText = "接続成功"
+        setStatus("接続成功")
     }
 
     if (msg.type === "pair-notify") {
-        document.getElementById("status").innerText = "相手が接続しました"
+        setStatus("相手が接続しました")
     }
 
     if (msg.type === "paired-confirm") {
-        document.getElementById("status").innerText = "許可されました!!"
+        setStatus("許可されました!!")
     }
 
     if (msg.type === "file") {
@@ -53,6 +124,8 @@ ws.onmessage = async (event) => {
         a.href = url
         a.download = msg.name
         a.click()
+
+        setStatus("ファイル受信: " + msg.name)
     }
 }
 
@@ -63,6 +136,17 @@ function pair() {
 
 function sendFile() {
     const file = document.getElementById("fileInput").files[0]
+
+    if (!file) {
+        setStatus("ファイルを選択してください")
+        return
+    }
+
+    if (!targetId) {
+        setStatus("接続してください")
+        return
+    }
+
     const reader = new FileReader()
 
     reader.onload = () => {
@@ -77,9 +161,21 @@ function sendFile() {
             name: file.name,
             data: base64
         }))
+
+        setStatus("送信完了: " + file.name)
     }
 
     reader.readAsArrayBuffer(file)
+}
+
+function updateFileName() {
+    const file = document.getElementById("fileInput").files[0]
+    document.getElementById("fileName").innerText =
+        file ? file.name : "選択されていません"
+}
+
+function setStatus(text) {
+    document.getElementById("status").innerText = text
 }
 </script>
 
