@@ -1,181 +1,87 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>Sync App</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      padding: 40px;
-      background: #f5f5f5;
-    }
-
-    .box {
-      background: white;
-      padding: 20px;
-      margin: 20px auto;
-      width: 300px;
-      border-radius: 10px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-
-    button {
-      padding: 10px;
-      margin-top: 10px;
-      width: 100%;
-      border: none;
-      background: #007bff;
-      color: white;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background: #0056b3;
-    }
-
-    input {
-      padding: 10px;
-      width: 100%;
-      margin-top: 10px;
-    }
-
-    #status {
-      margin-top: 20px;
-      font-weight: bold;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>Sync App</title>
 </head>
 <body>
 
-  <h1>🔗 Sync App</h1>
+<h2>ペア接続</h2>
 
-  <!-- コード生成 -->
-  <div class="box">
-    <h3>コード発行</h3>
-    <div id="code">----</div>
-    <button onclick="generateCode()">コード生成</button>
-    <div id="timer"></div>
-    <button onclick="approveConnection()">承認する</button>
-  </div>
+<input id="pairId" placeholder="ペアIDを入力">
+<button onclick="pair()">接続</button>
 
-  <!-- 接続 -->
-  <div class="box">
-    <h3>接続する</h3>
-    <input id="inputCode" placeholder="コード入力">
-    <button onclick="requestConnection()">接続申請</button>
-  </div>
+<h2>ファイル送信</h2>
 
-  <div id="status"></div>
+<input type="file" id="fileInput">
+<button onclick="sendFile()">送信</button>
 
-  <script>
-    let currentCode = "";
-    let countdown = null;
+<p id="status"></p>
 
-    // コード生成
-    async function generateCode() {
-      const res = await fetch("/api/pair", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ action: "generate" })
-      });
+<script>
+let ws
+let myId = Math.random().toString(36).substring(2, 8)
+let targetId = null
 
-      const data = await res.json();
-      currentCode = data.code;
+ws = new WebSocket("ws://localhost:3000")
 
-      document.getElementById("code").innerText = currentCode;
-      document.getElementById("status").innerText = "コード発行中...";
+ws.onopen = () => {
+    ws.send(JSON.stringify({ type: "register", id: myId }))
+}
 
-      startTimer(30);
+ws.onmessage = async (event) => {
+    const msg = JSON.parse(event.data)
+
+    if (msg.type === "pair-success") {
+        targetId = msg.from
+        document.getElementById("status").innerText = "接続成功"
     }
 
-    // タイマー
-    function startTimer(sec) {
-      clearInterval(countdown);
-
-      countdown = setInterval(() => {
-        sec--;
-        document.getElementById("timer").innerText = `有効期限: ${sec}秒`;
-
-        if (sec <= 0) {
-          clearInterval(countdown);
-          document.getElementById("code").innerText = "----";
-          document.getElementById("timer").innerText = "期限切れ";
-          currentCode = "";
-        }
-      }, 1000);
+    if (msg.type === "pair-notify") {
+        document.getElementById("status").innerText = "相手が接続しました"
     }
 
-    // 接続申請
-    async function requestConnection() {
-      const code = document.getElementById("inputCode").value;
-
-      const res = await fetch("/api/pair", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          action: "request",
-          code
-        })
-      });
-
-      const data = await res.json();
-
-      if (data.ok) {
-        document.getElementById("status").innerText = "申請送信済み...";
-      } else {
-        document.getElementById("status").innerText = "無効なコード";
-      }
+    if (msg.type === "paired-confirm") {
+        document.getElementById("status").innerText = "許可されました!!"
     }
 
-    // 承認
-    async function approveConnection() {
-      if (!currentCode) {
-        alert("コードがありません");
-        return;
-      }
+    if (msg.type === "file") {
+        const blob = new Blob([Uint8Array.from(atob(msg.data), c => c.charCodeAt(0))])
+        const url = URL.createObjectURL(blob)
 
-      await fetch("/api/pair", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          action: "approve",
-          code: currentCode
-        })
-      });
+        const a = document.createElement("a")
+        a.href = url
+        a.download = msg.name
+        a.click()
+    }
+}
 
-      document.getElementById("status").innerText = "承認しました";
+function pair() {
+    const id = document.getElementById("pairId").value
+    ws.send(JSON.stringify({ type: "pair", target: id }))
+}
+
+function sendFile() {
+    const file = document.getElementById("fileInput").files[0]
+    const reader = new FileReader()
+
+    reader.onload = () => {
+        const base64 = btoa(
+            new Uint8Array(reader.result)
+                .reduce((data, byte) => data + String.fromCharCode(byte), "")
+        )
+
+        ws.send(JSON.stringify({
+            type: "file",
+            to: targetId,
+            name: file.name,
+            data: base64
+        }))
     }
 
-    // 状態チェック
-    setInterval(async () => {
-      if (!currentCode) return;
-
-      const res = await fetch("/api/pair", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          action: "check",
-          code: currentCode
-        })
-      });
-
-      const data = await res.json();
-
-      if (data.approved) {
-        document.getElementById("status").innerText = "✅ 接続成功！";
-      }
-    }, 2000);
-  </script>
+    reader.readAsArrayBuffer(file)
+}
+</script>
 
 </body>
 </html>
