@@ -23,39 +23,29 @@ body {
   text-align: center;
 }
 
-h2 {
-  margin-bottom: 20px;
-}
-
 input {
   width: 100%;
   padding: 10px;
   border-radius: 8px;
   border: none;
-  margin-bottom: 15px;
+  margin-bottom: 10px;
 }
 
 button {
   width: 100%;
   padding: 10px;
-  border: none;
   border-radius: 8px;
+  border: none;
   margin-bottom: 10px;
   cursor: pointer;
 }
 
-.connect {
-  background: #3b82f6;
-  color: white;
-}
-
-.accept {
-  background: #22c55e;
-  color: white;
-}
+.create { background: #8b5cf6; color: white; }
+.connect { background: #3b82f6; color: white; }
+.accept { background: #22c55e; color: white; }
 
 .status {
-  margin-top: 15px;
+  margin-top: 10px;
   font-size: 14px;
   opacity: 0.8;
 }
@@ -68,11 +58,14 @@ button {
 
 <h2>ペア接続</h2>
 
-<input id="pairId" placeholder="ペアIDを入力">
+<button class="create" onclick="createPair()">コード生成</button>
+
+<input id="pairId" placeholder="ペアID">
 
 <button class="connect" onclick="requestPair()">接続</button>
 <button class="accept" onclick="acceptPair()">許可</button>
 
+<p id="timer" class="status"></p>
 <p id="status" class="status">未接続</p>
 
 </div>
@@ -81,6 +74,7 @@ button {
 let pairId = "";
 let connected = false;
 let notified = false;
+let expireTimer = null;
 
 // 通知許可
 async function enableNotification() {
@@ -89,14 +83,44 @@ async function enableNotification() {
   }
 }
 
-// 接続リクエスト
+// 🔥 コード生成
+async function createPair() {
+  const res = await fetch("/api/pair", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ action: "create" })
+  });
+
+  const data = await res.json();
+
+  pairId = data.pairId;
+  document.getElementById("pairId").value = pairId;
+
+  document.getElementById("status").textContent = "コード生成完了";
+
+  startTimer(60);
+}
+
+// ⏱️ タイマー
+function startTimer(seconds) {
+  clearInterval(expireTimer);
+
+  expireTimer = setInterval(() => {
+    seconds--;
+
+    document.getElementById("timer").textContent =
+      `有効期限: ${seconds}秒`;
+
+    if (seconds <= 0) {
+      clearInterval(expireTimer);
+      document.getElementById("status").textContent = "期限切れ";
+    }
+  }, 1000);
+}
+
+// 接続
 async function requestPair() {
   pairId = document.getElementById("pairId").value;
-
-  if (!pairId) {
-    alert("ペアIDを入力してください");
-    return;
-  }
 
   await fetch("/api/pair", {
     method: "POST",
@@ -107,8 +131,7 @@ async function requestPair() {
     })
   });
 
-  document.getElementById("status").textContent = "接続リクエスト送信中...";
-
+  document.getElementById("status").textContent = "接続待機中...";
   await enableNotification();
 
   watchStatus();
@@ -117,11 +140,6 @@ async function requestPair() {
 // 許可
 async function acceptPair() {
   pairId = document.getElementById("pairId").value;
-
-  if (!pairId) {
-    alert("ペアIDを入力してください");
-    return;
-  }
 
   await fetch("/api/pair", {
     method: "POST",
@@ -132,16 +150,21 @@ async function acceptPair() {
     })
   });
 
-  document.getElementById("status").textContent = "接続を許可しました";
+  document.getElementById("status").textContent = "許可しました";
 }
 
-// 状態監視（通知）
+// 状態監視
 function watchStatus() {
   setInterval(async () => {
     if (connected) return;
 
     const res = await fetch(`/api/pair?pairId=${pairId}`);
     const data = await res.json();
+
+    if (data.expired) {
+      document.getElementById("status").textContent = "期限切れ";
+      return;
+    }
 
     if (data.accepted && !notified) {
       notified = true;
