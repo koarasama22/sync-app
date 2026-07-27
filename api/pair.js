@@ -1,60 +1,41 @@
-import { WebSocketServer } from "ws"
+let pairs = {};
 
-const wss = new WebSocketServer({ port: 3000 })
+export default function handler(req, res) {
+  if (req.method === "POST") {
+    const { pairId, action } = req.body;
 
-const clients = new Map()
+    if (!pairs[pairId]) {
+      pairs[pairId] = { accepted: false };
+    }
 
-wss.on("connection", (ws) => {
+    if (action === "request") {
+      pairs[pairId].accepted = false;
+      return res.json({ status: "requested" });
+    }
 
-    ws.on("message", (message) => {
-        const data = JSON.parse(message)
+    if (action === "accept") {
+      pairs[pairId].accepted = true;
+      return res.json({ status: "accepted" });
+    }
 
-        if (data.type === "register") {
-            clients.set(data.id, ws)
-            ws.id = data.id
-        }
+    if (action === "send") {
+      if (!pairs[pairId]?.accepted) {
+        return res.status(403).json({ error: "not connected" });
+      }
 
-        if (data.type === "pair") {
-            const target = clients.get(data.target)
+      return res.json({ status: "file received" });
+    }
+  }
 
-            if (target) {
-                ws.targetId = data.target
-                target.targetId = ws.id
+  if (req.method === "GET") {
+    const { pairId } = req.query;
 
-                ws.send(JSON.stringify({
-                    type: "pair-success",
-                    from: data.target
-                }))
+    const pair = pairs[pairId];
 
-                target.send(JSON.stringify({
-                    type: "pair-notify",
-                    from: ws.id
-                }))
+    if (!pair) {
+      return res.json({ accepted: false });
+    }
 
-                target.send(JSON.stringify({
-                    type: "paired-confirm"
-                }))
-
-                ws.send(JSON.stringify({
-                    type: "paired-confirm"
-                }))
-            }
-        }
-
-        if (data.type === "file") {
-            const target = clients.get(data.to)
-
-            if (target) {
-                target.send(JSON.stringify({
-                    type: "file",
-                    name: data.name,
-                    data: data.data
-                }))
-            }
-        }
-    })
-
-    ws.on("close", () => {
-        clients.delete(ws.id)
-    })
-})
+    return res.json({ accepted: pair.accepted });
+  }
+}
