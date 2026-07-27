@@ -2,21 +2,130 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Sync System</title>
+  <title>Sync App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #0f172a;
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 { margin-bottom: 10px; }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .primary { background: #3b82f6; color: white; }
+    .danger { background: #ef4444; color: white; }
+    .box {
+      background: #1e293b;
+      padding: 20px;
+      border-radius: 10px;
+      margin-top: 20px;
+    }
+    input {
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      width: 200px;
+      text-align: center;
+    }
+    #status {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #94a3b8;
+    }
+  </style>
 </head>
 <body>
 
-<h2>🚀 Sync System</h2>
+<h1>🔗 Sync App</h1>
 
-<p>自分のID: <span id="myId"></span></p>
+<div class="box">
+  <h3>ペアリンクコード生成</h3>
+  <button class="primary" onclick="generateCode()">コード発行</button>
+  <p id="generatedCode"></p>
+  <p id="timer"></p>
+</div>
 
-<input id="target" placeholder="送信先ID">
-<button onclick="sendCast()">📤 キャスト送信</button>
-<button onclick="sendTab()">🌐 タブ送信</button>
-<button onclick="enableNotify()">🔔 通知ON</button>
+<div class="box">
+  <h3>コード入力</h3>
+  <input id="inputCode" placeholder="コード入力">
+  <br><br>
+  <button class="primary" onclick="requestConnect()">接続申請</button>
+</div>
 
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<script type="module" src="app.js"></script>
+<div class="box">
+  <h3>状態</h3>
+  <p id="status">未接続</p>
+  <button class="danger" onclick="disconnect()">解除</button>
+</div>
+
+<script>
+let activeCode = null;
+let timerInterval = null;
+
+// ランダムコード生成（6桁）
+function generateCode() {
+  activeCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+  document.getElementById("generatedCode").textContent = "コード: " + activeCode;
+
+  let timeLeft = 30;
+  document.getElementById("timer").textContent = "有効期限: 30秒";
+
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    document.getElementById("timer").textContent = "有効期限: " + timeLeft + "秒";
+
+    if (timeLeft <= 0) {
+      clearInterval(timerInterval);
+      activeCode = null;
+      document.getElementById("generatedCode").textContent = "期限切れ";
+      document.getElementById("timer").textContent = "";
+    }
+  }, 1000);
+}
+
+// 接続リクエスト
+function requestConnect() {
+  const input = document.getElementById("inputCode").value.toUpperCase();
+
+  if (!activeCode) {
+    updateStatus("コード無効 or 期限切れ");
+    return;
+  }
+
+  if (input !== activeCode) {
+    updateStatus("コードが違います");
+    return;
+  }
+
+  // 擬似「相手の許可」
+  const approved = confirm("相手が接続を許可しましたか？");
+
+  if (approved) {
+    updateStatus("✅ 接続完了");
+  } else {
+    updateStatus("❌ 拒否されました");
+  }
+}
+
+// 解除
+function disconnect() {
+  updateStatus("未接続");
+}
+
+// 状態表示
+function updateStatus(text) {
+  document.getElementById("status").textContent = text;
+}
+</script>
 
 </body>
 </html>
