@@ -6,15 +6,25 @@
 
 <style>
 body {
+  margin: 0;
   font-family: Arial;
   background: #0f172a;
   color: white;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
 }
 
+/* 共通 */
+.screen {
+  display: none;
+  height: 100vh;
+  justify-content: center;
+  align-items: center;
+}
+
+.active {
+  display: flex;
+}
+
+/* 接続画面 */
 .container {
   background: #1e293b;
   padding: 30px;
@@ -40,41 +50,82 @@ button {
   cursor: pointer;
 }
 
-.create { background: #8b5cf6; color: white; }
-.connect { background: #3b82f6; color: white; }
-.accept { background: #22c55e; color: white; }
+.create { background: #8b5cf6; }
+.connect { background: #3b82f6; }
+.accept { background: #22c55e; }
 
-.status {
-  margin-top: 10px;
-  font-size: 14px;
-  opacity: 0.8;
+/* 接続後画面 */
+.main {
+  width: 100%;
+  height: 100vh;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.topbar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.add-btn {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f59e0b;
+  border: none;
+  cursor: pointer;
+}
+
+.device-text {
+  font-size: 20px;
 }
 </style>
 </head>
 
 <body>
 
-<div class="container">
+<!-- 接続前 -->
+<div id="pairScreen" class="screen active">
+  <div class="container">
 
-<h2>ペア接続</h2>
+    <h2>ペア接続</h2>
 
-<button class="create" onclick="createPair()">コード生成</button>
+    <button class="create" onclick="createPair()">コード生成</button>
 
-<input id="pairId" placeholder="ペアID">
+    <input id="pairId" placeholder="ペアID">
 
-<button class="connect" onclick="requestPair()">接続</button>
-<button class="accept" onclick="acceptPair()">許可</button>
+    <button class="connect" onclick="requestPair()">接続</button>
+    <button class="accept" onclick="acceptPair()">許可</button>
 
-<p id="timer" class="status"></p>
-<p id="status" class="status">未接続</p>
+    <p id="status">未接続</p>
 
+  </div>
+</div>
+
+<!-- 接続後 -->
+<div id="mainScreen" class="screen">
+  <div class="main">
+
+    <div class="topbar">
+      <button class="add-btn" onclick="resetApp()">＋ 新しいデバイス</button>
+    </div>
+
+    <div id="deviceText" class="device-text">
+      接続済み
+    </div>
+
+    <button onclick="sendNotification()">通知を送信</button>
+
+  </div>
 </div>
 
 <script>
 let pairId = "";
 let connected = false;
 let notified = false;
-let expireTimer = null;
 
 // 通知許可
 async function enableNotification() {
@@ -83,7 +134,7 @@ async function enableNotification() {
   }
 }
 
-// 🔥 コード生成
+// コード生成
 async function createPair() {
   const res = await fetch("/api/pair", {
     method: "POST",
@@ -95,27 +146,6 @@ async function createPair() {
 
   pairId = data.pairId;
   document.getElementById("pairId").value = pairId;
-
-  document.getElementById("status").textContent = "コード生成完了";
-
-  startTimer(60);
-}
-
-// ⏱️ タイマー
-function startTimer(seconds) {
-  clearInterval(expireTimer);
-
-  expireTimer = setInterval(() => {
-    seconds--;
-
-    document.getElementById("timer").textContent =
-      `有効期限: ${seconds}秒`;
-
-    if (seconds <= 0) {
-      clearInterval(expireTimer);
-      document.getElementById("status").textContent = "期限切れ";
-    }
-  }, 1000);
 }
 
 // 接続
@@ -161,24 +191,38 @@ function watchStatus() {
     const res = await fetch(`/api/pair?pairId=${pairId}`);
     const data = await res.json();
 
-    if (data.expired) {
-      document.getElementById("status").textContent = "期限切れ";
-      return;
-    }
-
     if (data.accepted && !notified) {
       notified = true;
       connected = true;
 
-      document.getElementById("status").textContent = "接続済み";
-
-      new Notification("接続成功", {
-        body: "ペア接続が許可されました！"
-      });
-
-      alert("許可されました!!");
+      switchToMain();
     }
   }, 2000);
+}
+
+// 画面切り替え
+function switchToMain() {
+  document.getElementById("pairScreen").classList.remove("active");
+  document.getElementById("mainScreen").classList.add("active");
+
+  document.getElementById("deviceText").textContent =
+    pairId + " のデバイスに通知を送信";
+
+  new Notification("接続成功", {
+    body: "デバイスが接続されました"
+  });
+}
+
+// 通知送信（デモ）
+function sendNotification() {
+  new Notification("送信しました", {
+    body: "相手に通知を送りました"
+  });
+}
+
+// リセット（新しいデバイス）
+function resetApp() {
+  location.reload();
 }
 </script>
 
