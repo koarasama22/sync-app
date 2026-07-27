@@ -3,129 +3,179 @@
 <head>
   <meta charset="UTF-8">
   <title>Sync App</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
       font-family: sans-serif;
-      background: #0f172a;
-      color: white;
       text-align: center;
-      padding: 20px;
+      padding: 40px;
+      background: #f5f5f5;
     }
-    h1 { margin-bottom: 10px; }
+
+    .box {
+      background: white;
+      padding: 20px;
+      margin: 20px auto;
+      width: 300px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
     button {
-      padding: 10px 20px;
-      margin: 5px;
+      padding: 10px;
+      margin-top: 10px;
+      width: 100%;
       border: none;
-      border-radius: 8px;
+      background: #007bff;
+      color: white;
+      border-radius: 5px;
       cursor: pointer;
     }
-    .primary { background: #3b82f6; color: white; }
-    .danger { background: #ef4444; color: white; }
-    .box {
-      background: #1e293b;
-      padding: 20px;
-      border-radius: 10px;
-      margin-top: 20px;
+
+    button:hover {
+      background: #0056b3;
     }
+
     input {
       padding: 10px;
-      border-radius: 8px;
-      border: none;
-      width: 200px;
-      text-align: center;
-    }
-    #status {
+      width: 100%;
       margin-top: 10px;
-      font-size: 14px;
-      color: #94a3b8;
+    }
+
+    #status {
+      margin-top: 20px;
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
 
-<h1>🔗 Sync App</h1>
+  <h1>🔗 Sync App</h1>
 
-<div class="box">
-  <h3>ペアリンクコード生成</h3>
-  <button class="primary" onclick="generateCode()">コード発行</button>
-  <p id="generatedCode"></p>
-  <p id="timer"></p>
-</div>
+  <!-- コード生成 -->
+  <div class="box">
+    <h3>コード発行</h3>
+    <div id="code">----</div>
+    <button onclick="generateCode()">コード生成</button>
+    <div id="timer"></div>
+    <button onclick="approveConnection()">承認する</button>
+  </div>
 
-<div class="box">
-  <h3>コード入力</h3>
-  <input id="inputCode" placeholder="コード入力">
-  <br><br>
-  <button class="primary" onclick="requestConnect()">接続申請</button>
-</div>
+  <!-- 接続 -->
+  <div class="box">
+    <h3>接続する</h3>
+    <input id="inputCode" placeholder="コード入力">
+    <button onclick="requestConnection()">接続申請</button>
+  </div>
 
-<div class="box">
-  <h3>状態</h3>
-  <p id="status">未接続</p>
-  <button class="danger" onclick="disconnect()">解除</button>
-</div>
+  <div id="status"></div>
 
-<script>
-let activeCode = null;
-let timerInterval = null;
+  <script>
+    let currentCode = "";
+    let countdown = null;
 
-// ランダムコード生成（6桁）
-function generateCode() {
-  activeCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-  document.getElementById("generatedCode").textContent = "コード: " + activeCode;
+    // コード生成
+    async function generateCode() {
+      const res = await fetch("/api/pair", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ action: "generate" })
+      });
 
-  let timeLeft = 30;
-  document.getElementById("timer").textContent = "有効期限: 30秒";
+      const data = await res.json();
+      currentCode = data.code;
 
-  clearInterval(timerInterval);
-  timerInterval = setInterval(() => {
-    timeLeft--;
-    document.getElementById("timer").textContent = "有効期限: " + timeLeft + "秒";
+      document.getElementById("code").innerText = currentCode;
+      document.getElementById("status").innerText = "コード発行中...";
 
-    if (timeLeft <= 0) {
-      clearInterval(timerInterval);
-      activeCode = null;
-      document.getElementById("generatedCode").textContent = "期限切れ";
-      document.getElementById("timer").textContent = "";
+      startTimer(30);
     }
-  }, 1000);
-}
 
-// 接続リクエスト
-function requestConnect() {
-  const input = document.getElementById("inputCode").value.toUpperCase();
+    // タイマー
+    function startTimer(sec) {
+      clearInterval(countdown);
 
-  if (!activeCode) {
-    updateStatus("コード無効 or 期限切れ");
-    return;
-  }
+      countdown = setInterval(() => {
+        sec--;
+        document.getElementById("timer").innerText = `有効期限: ${sec}秒`;
 
-  if (input !== activeCode) {
-    updateStatus("コードが違います");
-    return;
-  }
+        if (sec <= 0) {
+          clearInterval(countdown);
+          document.getElementById("code").innerText = "----";
+          document.getElementById("timer").innerText = "期限切れ";
+          currentCode = "";
+        }
+      }, 1000);
+    }
 
-  // 擬似「相手の許可」
-  const approved = confirm("相手が接続を許可しましたか？");
+    // 接続申請
+    async function requestConnection() {
+      const code = document.getElementById("inputCode").value;
 
-  if (approved) {
-    updateStatus("✅ 接続完了");
-  } else {
-    updateStatus("❌ 拒否されました");
-  }
-}
+      const res = await fetch("/api/pair", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          action: "request",
+          code
+        })
+      });
 
-// 解除
-function disconnect() {
-  updateStatus("未接続");
-}
+      const data = await res.json();
 
-// 状態表示
-function updateStatus(text) {
-  document.getElementById("status").textContent = text;
-}
-</script>
+      if (data.ok) {
+        document.getElementById("status").innerText = "申請送信済み...";
+      } else {
+        document.getElementById("status").innerText = "無効なコード";
+      }
+    }
+
+    // 承認
+    async function approveConnection() {
+      if (!currentCode) {
+        alert("コードがありません");
+        return;
+      }
+
+      await fetch("/api/pair", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          action: "approve",
+          code: currentCode
+        })
+      });
+
+      document.getElementById("status").innerText = "承認しました";
+    }
+
+    // 状態チェック
+    setInterval(async () => {
+      if (!currentCode) return;
+
+      const res = await fetch("/api/pair", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          action: "check",
+          code: currentCode
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.approved) {
+        document.getElementById("status").innerText = "✅ 接続成功！";
+      }
+    }, 2000);
+  </script>
 
 </body>
 </html>
