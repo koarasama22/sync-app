@@ -3,32 +3,100 @@
 <head>
 <meta charset="UTF-8">
 <title>Sync App</title>
+
+<style>
+body {
+  font-family: Arial;
+  background: #0f172a;
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.container {
+  background: #1e293b;
+  padding: 30px;
+  border-radius: 12px;
+  width: 320px;
+  text-align: center;
+}
+
+h2 {
+  margin-bottom: 20px;
+}
+
+input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  margin-bottom: 15px;
+}
+
+button {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+
+.connect {
+  background: #3b82f6;
+  color: white;
+}
+
+.accept {
+  background: #22c55e;
+  color: white;
+}
+
+.status {
+  margin-top: 15px;
+  font-size: 14px;
+  opacity: 0.8;
+}
+</style>
 </head>
+
 <body>
+
+<div class="container">
 
 <h2>ペア接続</h2>
 
 <input id="pairId" placeholder="ペアIDを入力">
-<button onclick="requestPair()">接続</button>
-<button onclick="acceptPair()">許可</button>
 
-<p id="status">未接続</p>
+<button class="connect" onclick="requestPair()">接続</button>
+<button class="accept" onclick="acceptPair()">許可</button>
+
+<p id="status" class="status">未接続</p>
+
+</div>
 
 <script>
 let pairId = "";
 let connected = false;
 let notified = false;
 
-// 🔔 通知許可
+// 通知許可
 async function enableNotification() {
   if (Notification.permission !== "granted") {
     await Notification.requestPermission();
   }
 }
 
-// 🔗 接続リクエスト
+// 接続リクエスト
 async function requestPair() {
   pairId = document.getElementById("pairId").value;
+
+  if (!pairId) {
+    alert("ペアIDを入力してください");
+    return;
+  }
 
   await fetch("/api/pair", {
     method: "POST",
@@ -39,16 +107,21 @@ async function requestPair() {
     })
   });
 
-  document.getElementById("status").textContent = "リクエスト送信中...";
-  
+  document.getElementById("status").textContent = "接続リクエスト送信中...";
+
   await enableNotification();
 
   watchStatus();
 }
 
-// ✅ 許可（受信側）
+// 許可
 async function acceptPair() {
   pairId = document.getElementById("pairId").value;
+
+  if (!pairId) {
+    alert("ペアIDを入力してください");
+    return;
+  }
 
   await fetch("/api/pair", {
     method: "POST",
@@ -59,10 +132,10 @@ async function acceptPair() {
     })
   });
 
-  document.getElementById("status").textContent = "許可しました";
+  document.getElementById("status").textContent = "接続を許可しました";
 }
 
-// 🔄 状態監視（ここが通知の核）
+// 状態監視（通知）
 function watchStatus() {
   setInterval(async () => {
     if (connected) return;
