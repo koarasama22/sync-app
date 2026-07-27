@@ -14,32 +14,19 @@
 
 <p id="status">未接続</p>
 
-<h2>ファイル送信</h2>
-
-<input type="file" id="fileInput">
-<p id="fileName">選択されていません</p>
-<button onclick="sendFile()">送信</button>
-
 <script>
 let pairId = "";
 let connected = false;
 let notified = false;
 
-// ファイル名表示
-document.getElementById("fileInput").addEventListener("change", (e) => {
-  const file = e.target.files[0];
-  document.getElementById("fileName").textContent =
-    file ? file.name : "選択されていません";
-});
-
-// 通知許可
+// 🔔 通知許可
 async function enableNotification() {
   if (Notification.permission !== "granted") {
     await Notification.requestPermission();
   }
 }
 
-// 接続リクエスト
+// 🔗 接続リクエスト
 async function requestPair() {
   pairId = document.getElementById("pairId").value;
 
@@ -52,13 +39,14 @@ async function requestPair() {
     })
   });
 
-  document.getElementById("status").textContent = "接続リクエスト送信中...";
-  enableNotification();
+  document.getElementById("status").textContent = "リクエスト送信中...";
+  
+  await enableNotification();
 
   watchStatus();
 }
 
-// 許可（受信側）
+// ✅ 許可（受信側）
 async function acceptPair() {
   pairId = document.getElementById("pairId").value;
 
@@ -71,10 +59,10 @@ async function acceptPair() {
     })
   });
 
-  document.getElementById("status").textContent = "接続を許可しました";
+  document.getElementById("status").textContent = "許可しました";
 }
 
-// 状態監視（ポーリング）
+// 🔄 状態監視（ここが通知の核）
 function watchStatus() {
   setInterval(async () => {
     if (connected) return;
@@ -95,33 +83,6 @@ function watchStatus() {
       alert("許可されました!!");
     }
   }, 2000);
-}
-
-// ファイル送信
-async function sendFile() {
-  if (!connected) {
-    alert("接続されていません");
-    return;
-  }
-
-  const file = document.getElementById("fileInput").files[0];
-
-  if (!file) {
-    alert("ファイルを選択してください");
-    return;
-  }
-
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("pairId", pairId);
-  formData.append("action", "send");
-
-  await fetch("/api/pair", {
-    method: "POST",
-    body: formData
-  });
-
-  alert("送信しました");
 }
 </script>
 
