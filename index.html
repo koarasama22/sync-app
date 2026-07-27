@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Sync System</title>
+</head>
+<body>
+
+<h2>🚀 Sync System</h2>
+
+<p>自分のID: <span id="myId"></span></p>
+
+<input id="target" placeholder="送信先ID">
+<button onclick="sendCast()">📤 キャスト送信</button>
+<button onclick="sendTab()">🌐 タブ送信</button>
+<button onclick="enableNotify()">🔔 通知ON</button>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script type="module" src="app.js"></script>
+
+</body>
+</html>
