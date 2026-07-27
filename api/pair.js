@@ -17,14 +17,6 @@ export default function handler(req, res) {
       pairs[pairId].accepted = true;
       return res.json({ status: "accepted" });
     }
-
-    if (action === "send") {
-      if (!pairs[pairId]?.accepted) {
-        return res.status(403).json({ error: "not connected" });
-      }
-
-      return res.json({ status: "file received" });
-    }
   }
 
   if (req.method === "GET") {
@@ -32,10 +24,8 @@ export default function handler(req, res) {
 
     const pair = pairs[pairId];
 
-    if (!pair) {
-      return res.json({ accepted: false });
-    }
-
-    return res.json({ accepted: pair.accepted });
+    return res.json({
+      accepted: pair ? pair.accepted : false
+    });
   }
 }
